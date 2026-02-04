@@ -1,0 +1,67 @@
+steps:
+  # Generate .env file with actual keys for build-time injection
+  - name: 'ubuntu'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "Generating .env.production file..."
+        cat > .env.production <<EOF
+        VITE_FMP_API_KEY=${_VITE_FMP_API_KEY}
+        VITE_GEMINI_API_KEY=${_VITE_GEMINI_API_KEY}
+        VITE_PERPLEXITY_API_KEY=${_VITE_PERPLEXITY_API_KEY}
+        VITE_POLYGON_API_KEY=${_VITE_POLYGON_API_KEY}
+        VITE_OPENAI_API_KEY=${_VITE_OPENAI_API_KEY}
+        EOF
+        
+        echo "=== Generated .env.production Content (Masked) ==="
+        grep -v "KEY" .env.production || true
+        echo "Keys present: $(wc -l < .env.production)"
+        echo "======================================="
+        echo "Workspace content:"
+        ls -la
+
+  # Build the container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/ai-predict-pro:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/ai-predict-pro:latest'
+      - '.'
+  
+  # Push the container image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/ai-predict-pro:$COMMIT_SHA']
+  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/ai-predict-pro:latest']
+  
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        gcloud run deploy ai-predict-pro-v11-stable \
+          --image gcr.io/$PROJECT_ID/ai-predict-pro:$COMMIT_SHA \
+          --region us-west1 \
+          --platform managed \
+          --allow-unauthenticated \
+          --set-env-vars VITE_FMP_API_KEY=${_VITE_FMP_API_KEY},VITE_GEMINI_API_KEY=${_VITE_GEMINI_API_KEY},VITE_PERPLEXITY_API_KEY=${_VITE_PERPLEXITY_API_KEY},VITE_POLYGON_API_KEY=${_VITE_POLYGON_API_KEY},VITE_OPENAI_API_KEY=${_VITE_OPENAI_API_KEY}
+
+images:
+  - 'gcr.io/$PROJECT_ID/ai-predict-pro:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/ai-predict-pro:latest'
+
+# Substitution variables (set these in Cloud Build trigger)
+substitutions:
+  _VITE_FMP_API_KEY: ''
+  _VITE_GEMINI_API_KEY: ''
+  _VITE_PERPLEXITY_API_KEY: ''
+  _VITE_POLYGON_API_KEY: ''
+  _VITE_OPENAI_API_KEY: ''
+
+options:
+  logging: CLOUD_LOGGING_ONLY

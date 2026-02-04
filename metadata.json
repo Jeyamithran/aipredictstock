@@ -1,0 +1,5 @@
+{
+  "name": "AI Predict Pro Dashboard",
+  "description": "A comprehensive day trading dashboard visualizing AI-driven stock signals, simulating the provided Pine Script logic with Gemini AI integration for options trading analysis.",
+  "requestFramePermissions": []
+}
